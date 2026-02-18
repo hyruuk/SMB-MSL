@@ -230,7 +230,6 @@ def main():
         retro_env.reset()  # Trigger emulator init now
 
     # --- Create window (after retro env, so shaders compile cleanly) ---
-    print("[DEBUG] Creating PsychoPy window...")
     win = visual.Window(
         size=screen_size,
         fullscr=FULLSCREEN,
@@ -240,23 +239,18 @@ def main():
         allowGUI=False,
         checkTiming=False,  # Skip frame rate measurement (hangs after retro init)
     )
-    print("[DEBUG] Window created")
 
     # Flush any stale events left over from the GUI dialog
     event.clearEvents()
 
     input_handler = InputHandler(win)
-    print("[DEBUG] InputHandler created")
 
     # --- Create GameEngine if gameplay mode ---
     engine = None
     if retro_env is not None:
         from smb_ssl_task.game import GameEngine
-        print("[DEBUG] Creating GameEngine...")
         engine = GameEngine(win, scenes_dataset_dir, env=retro_env)
-        print("[DEBUG] GameEngine created")
 
-    print("[DEBUG] Dispatching to session...")
 
     try:
         if session_type == "training":

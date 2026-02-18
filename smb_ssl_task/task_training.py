@@ -22,17 +22,42 @@ from smb_ssl_task.config import (
     INTER_EXECUTION_INTERVAL,
     INTER_TRIAL_INTERVAL,
     FEEDBACK_DURATION,
+    FIXATION_DURATION,
+    COUNTDOWN_STEPS,
+    COUNTDOWN_STEP_DURATION,
+    GAMEPLAY_BAR_Y_BASE,
+    GAMEPLAY_BAR_FONT_SIZE,
 )
-from smb_ssl_task.scenes import get_scenes, get_canonical_sequence, get_canonical_sequence_source
+from smb_ssl_task.config import verbose
+from smb_ssl_task.scenes import get_scenes, get_canonical_sequence, get_canonical_sequence_source, get_clip_savestate_path
 from smb_ssl_task.msp import ActionSequenceDisplay, collect_msp_execution
-from smb_ssl_task.game import execute_gameplay_trial
+from smb_ssl_task.game import (
+    execute_gameplay_trial,
+    replay_bk2_preview,
+    execute_gameplay_with_tracking,
+)
 from smb_ssl_task.display import (
     show_instructions,
     show_trial_points,
     show_block_feedback,
     show_rest,
+    show_fixation_rest,
+    show_countdown,
 )
 from smb_ssl_task.data_logging import DataLogger
+
+
+def _wait_with_escape(win, input_handler, duration):
+    """Wait for *duration* seconds, polling for escape each frame.
+
+    Returns True if escape was pressed, False otherwise.
+    """
+    timer = core.CountdownTimer(duration)
+    while timer.getTime() > 0:
+        if input_handler.check_escape():
+            return True
+        win.flip()
+    return False
 
 
 def _compute_points_msp(exec2_data, mt_threshold):
@@ -103,6 +128,10 @@ def run_training_session(win, input_handler, participant_id, group,
 
     if mode == "msp":
         seq_display = ActionSequenceDisplay(win)
+    else:
+        seq_display = ActionSequenceDisplay(
+            win, y_base=GAMEPLAY_BAR_Y_BASE, font_size=GAMEPLAY_BAR_FONT_SIZE,
+        )
 
     if mode == "msp":
         show_instructions(
@@ -151,7 +180,8 @@ def run_training_session(win, input_handler, participant_id, group,
                     action_seq = get_canonical_sequence(scene_id)
                     target_symbols = [s for s, _ in action_seq]
                     source_clip = get_canonical_sequence_source(scene_id)
-                    print(f"[MSP] Scene: {scene_id} | Source: {source_clip or 'placeholder'} | Sequence: {' '.join(target_symbols)}")
+                    if verbose():
+                        print(f"[MSP] Scene: {scene_id} | BK2: {source_clip or 'placeholder'} | Sequence: {' '.join(target_symbols)}")
 
                     # --- Execution 1: visible ---
                     exec1 = collect_msp_execution(
@@ -215,11 +245,46 @@ def run_training_session(win, input_handler, participant_id, group,
                         block_mts.append(exec2["movement_time"])
 
                 else:  # gameplay mode
-                    engine.load_scene(scene_id, scene_info)
+                    # Select a BK2 clip and load the matching savestate
+                    action_seq = get_canonical_sequence(scene_id)
+                    source_clip = get_canonical_sequence_source(scene_id)
+                    clip_state = get_clip_savestate_path(scene_id)
+                    target_symbols = [s for s, _ in action_seq]
+                    if verbose():
+                        print(f"[GAMEPLAY] Scene: {scene_id} | BK2: {source_clip or 'placeholder'} | Seq: {' '.join(target_symbols)}")
 
-                    # --- Execution 1: normal play ---
-                    exec1 = execute_gameplay_trial(
-                        win, input_handler, engine, scene_info,
+                    # --- Fixation ---
+                    if show_fixation_rest(win, FIXATION_DURATION,
+                                          input_handler=input_handler):
+                        return
+
+                    # --- BK2 Preview Replay ---
+                    engine.load_scene(scene_id, scene_info, state_path=clip_state)
+                    preview_result = replay_bk2_preview(
+                        win, input_handler, engine, seq_display, action_seq,
+                    )
+                    if preview_result is None:
+                        return
+                    preview_exit_x = preview_result["exit_x"]
+
+                    # --- Countdown (overlaid on frozen game frame) ---
+                    def _draw_game_and_bar():
+                        engine.render()
+                        seq_display.draw()
+                    if show_countdown(
+                        win,
+                        steps=COUNTDOWN_STEPS,
+                        step_duration=COUNTDOWN_STEP_DURATION,
+                        draw_extras=_draw_game_and_bar,
+                        input_handler=input_handler,
+                    ):
+                        return
+
+                    # --- Execution 1: player plays with tracking ---
+                    engine.load_scene(scene_id, scene_info, state_path=clip_state)
+                    exec1 = execute_gameplay_with_tracking(
+                        win, input_handler, engine, seq_display,
+                        action_seq, preview_exit_x,
                     )
                     if exec1 is None:
                         return
@@ -233,15 +298,22 @@ def run_training_session(win, input_handler, participant_id, group,
                         outcome=exec1["outcome"],
                         traversal_time=exec1["traversal_time"],
                         distance_reached=exec1["distance_reached"],
+                        target_sequence=exec1["target_sequence"],
+                        response_sequence=exec1["response_sequence"],
+                        accuracy_per_element=exec1["accuracy_per_element"],
+                        accuracy_trial=exec1["accuracy_trial"],
                     )
 
-                    win.flip()
-                    core.wait(INTER_EXECUTION_INTERVAL)
+                    # --- Inter-execution pause (escape-aware) ---
+                    if _wait_with_escape(win, input_handler,
+                                         INTER_EXECUTION_INTERVAL):
+                        return
 
-                    # --- Execution 2: immediate replay ---
-                    engine.load_scene(scene_id, scene_info)
-                    exec2 = execute_gameplay_trial(
-                        win, input_handler, engine, scene_info,
+                    # --- Execution 2: player plays from memory ---
+                    engine.load_scene(scene_id, scene_info, state_path=clip_state)
+                    exec2 = execute_gameplay_with_tracking(
+                        win, input_handler, engine, seq_display,
+                        action_seq, preview_exit_x,
                     )
                     if exec2 is None:
                         return
@@ -258,6 +330,10 @@ def run_training_session(win, input_handler, participant_id, group,
                         outcome=exec2["outcome"],
                         traversal_time=exec2["traversal_time"],
                         distance_reached=exec2["distance_reached"],
+                        target_sequence=exec2["target_sequence"],
+                        response_sequence=exec2["response_sequence"],
+                        accuracy_per_element=exec2["accuracy_per_element"],
+                        accuracy_trial=exec2["accuracy_trial"],
                         points_awarded=points,
                     )
 

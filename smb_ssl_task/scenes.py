@@ -5,6 +5,7 @@ Scene definitions, BK2 parsing, and action vocabulary for the SMB SSL task.
 Action sequences are dynamically extracted from random BK2 replay clips at runtime.
 """
 
+import json
 import os
 import random
 import zipfile
@@ -240,6 +241,22 @@ def find_all_clips(scene_id, scenes_path=None):
     return sorted(clips)
 
 
+def _clip_is_cleared(bk2_path):
+    """Return True if the clip's summary JSON reports outcome 'completed'.
+
+    Each BK2 has a companion ``*_summary.json`` with an ``Outcome`` field
+    (``"completed"`` or ``"death"``).  Returns False if the summary is
+    missing or the outcome is not ``"completed"``.
+    """
+    summary_path = bk2_path.replace(".bk2", "_summary.json")
+    try:
+        with open(summary_path) as f:
+            meta = json.load(f)
+        return meta.get("Outcome") == "completed"
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
 def _clip_passes_filter(seq):
     """Check whether an extracted sequence meets the clip filter criteria."""
     n_elements = len(seq)
@@ -264,8 +281,9 @@ def get_canonical_sequence(scene_id):
     """
     global _last_source
 
-    # Try dynamic extraction — shuffle all clips and pick the first that passes
+    # Try dynamic extraction — shuffle cleared clips and pick the first that passes
     clips = find_all_clips(scene_id)
+    clips = [c for c in clips if _clip_is_cleared(c)]
     if clips:
         random.shuffle(clips)
         for bk2_path in clips:
@@ -276,7 +294,7 @@ def get_canonical_sequence(scene_id):
                 # Filter out idle '_' elements (standing still)
                 seq = [(sym, dur) for sym, dur in seq if sym != "_"]
                 if seq and _clip_passes_filter(seq):
-                    _last_source[scene_id] = os.path.basename(bk2_path)
+                    _last_source[scene_id] = bk2_path  # full path
                     return seq
             except Exception as e:
                 print(f"[WARNING] Failed to extract from {bk2_path}: {e}")
@@ -292,11 +310,29 @@ def get_canonical_sequence(scene_id):
 
 
 def get_canonical_sequence_source(scene_id):
-    """Return the source BK2 clip filename for the last extracted sequence.
+    """Return the full path to the source BK2 clip for the last extracted sequence.
 
     Returns None if the sequence is a placeholder.
     """
     return _last_source.get(scene_id)
+
+
+def get_clip_savestate_path(scene_id):
+    """Return the .state file corresponding to the last BK2 used for this scene.
+
+    Each BK2 in the mario.scenes dataset has a matching .state file
+    (same path and name, different extension).
+
+    Returns None if no BK2 was used (placeholder sequence) or if the
+    .state file doesn't exist.
+    """
+    bk2_path = _last_source.get(scene_id)
+    if bk2_path is None:
+        return None
+    state_path = bk2_path.replace(".bk2", ".state")
+    if os.path.isfile(state_path):
+        return state_path
+    return None
 
 
 def get_pretrain_scenes():

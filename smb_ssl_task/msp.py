@@ -48,14 +48,16 @@ class ActionSequenceDisplay:
         Maximum number of elements to pre-allocate.
     """
 
-    def __init__(self, win, max_length=30):
+    def __init__(self, win, max_length=30, y_base=None, font_size=None):
         self.win = win
         self.max_length = max_length
         self._n_active = 0
         self._target_durations = []  # seconds per element
         self._bar_widths = []        # pixel width per element
 
-        bar_y = ACTION_Y_POS + DURATION_BAR_Y_OFFSET
+        self._y_base = y_base if y_base is not None else ACTION_Y_POS
+        self._font_size = font_size if font_size is not None else ACTION_FONT_SIZE
+        bar_y = self._y_base + DURATION_BAR_Y_OFFSET
 
         # Pre-create TextStim + bar components for each slot.
         # Actual widths and positions are set by show().
@@ -66,8 +68,8 @@ class ActionSequenceDisplay:
             stim = visual.TextStim(
                 win,
                 text="",
-                pos=(0, ACTION_Y_POS),
-                height=ACTION_FONT_SIZE,
+                pos=(0, self._y_base),
+                height=self._font_size,
                 color=ACTION_COLOR_DEFAULT,
                 units="pix",
                 font=DISPLAY_FONT,
@@ -147,7 +149,7 @@ class ActionSequenceDisplay:
             center_x = x_cursor + bar_w / 2
 
             self._stims[i].text = SYMBOL_DISPLAY.get(symbol, symbol)
-            self._stims[i].pos = (center_x, ACTION_Y_POS)
+            self._stims[i].pos = (center_x, self._y_base)
             self._stims[i].color = ACTION_COLOR_DEFAULT
 
             self._bar_bgs[i].width = bar_w

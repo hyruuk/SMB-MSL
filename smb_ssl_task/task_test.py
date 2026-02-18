@@ -13,7 +13,8 @@ from smb_ssl_task.config import (
     INTER_EXECUTION_INTERVAL,
     INTER_TRIAL_INTERVAL,
 )
-from smb_ssl_task.scenes import get_scenes, get_canonical_sequence, get_canonical_sequence_source
+from smb_ssl_task.config import verbose
+from smb_ssl_task.scenes import get_scenes, get_canonical_sequence, get_canonical_sequence_source, get_clip_savestate_path
 from smb_ssl_task.msp import ActionSequenceDisplay, collect_msp_execution
 from smb_ssl_task.game import execute_gameplay_trial
 from smb_ssl_task.display import show_instructions
@@ -88,7 +89,8 @@ def run_test_session(win, input_handler, participant_id, group,
                 action_seq = get_canonical_sequence(scene_id)
                 target_symbols = [s for s, _ in action_seq]
                 source_clip = get_canonical_sequence_source(scene_id)
-                print(f"[MSP] Scene: {scene_id} | Source: {source_clip or 'placeholder'} | Sequence: {' '.join(target_symbols)}")
+                if verbose():
+                    print(f"[MSP] Scene: {scene_id} | BK2: {source_clip or 'placeholder'} | Sequence: {' '.join(target_symbols)}")
 
                 # --- Execution 1: visible ---
                 exec1 = collect_msp_execution(
@@ -145,7 +147,12 @@ def run_test_session(win, input_handler, participant_id, group,
                 )
 
             else:  # gameplay mode
-                engine.load_scene(scene_id, scene_info)
+                action_seq = get_canonical_sequence(scene_id)
+                source_clip = get_canonical_sequence_source(scene_id)
+                clip_state = get_clip_savestate_path(scene_id)
+                if verbose():
+                    print(f"[GAMEPLAY] Scene: {scene_id} | BK2: {source_clip or 'placeholder'}")
+                engine.load_scene(scene_id, scene_info, state_path=clip_state)
 
                 # --- Execution 1: normal play ---
                 exec1 = execute_gameplay_trial(
@@ -169,8 +176,8 @@ def run_test_session(win, input_handler, participant_id, group,
                 win.flip()
                 core.wait(INTER_EXECUTION_INTERVAL)
 
-                # --- Execution 2: immediate replay ---
-                engine.load_scene(scene_id, scene_info)
+                # --- Execution 2: immediate replay (same savestate) ---
+                engine.load_scene(scene_id, scene_info, state_path=clip_state)
                 exec2 = execute_gameplay_trial(
                     win, input_handler, engine, scene_info,
                 )

@@ -239,7 +239,7 @@ def show_run_rest(win, run_number, n_runs):
     event.waitKeys()
 
 
-def show_fixation_rest(win, duration):
+def show_fixation_rest(win, duration, input_handler=None):
     """Timed rest period with fixation cross.
 
     Parameters
@@ -247,6 +247,13 @@ def show_fixation_rest(win, duration):
     win : psychopy.visual.Window
     duration : float
         Seconds to show fixation.
+    input_handler : InputHandler or None
+        If provided, polls for escape each frame.
+
+    Returns
+    -------
+    bool
+        True if escape was pressed (only when input_handler provided).
     """
     cross = visual.TextStim(
         win,
@@ -257,9 +264,65 @@ def show_fixation_rest(win, duration):
         units="pix",
         bold=True,
     )
-    cross.draw()
-    win.flip()
-    core.wait(duration)
+    if input_handler is None:
+        cross.draw()
+        win.flip()
+        core.wait(duration)
+        return False
+
+    timer = core.CountdownTimer(duration)
+    while timer.getTime() > 0:
+        if input_handler.check_escape():
+            return True
+        cross.draw()
+        win.flip()
+    return False
+
+
+def show_countdown(win, steps=None, step_duration=0.75, draw_extras=None,
+                   input_handler=None):
+    """Display a countdown sequence overlaid on the current scene.
+
+    Parameters
+    ----------
+    win : psychopy.visual.Window
+    steps : list[str] or None
+        Text for each step (default: ["3", "2", "1", "GO"]).
+    step_duration : float
+        Seconds per step.
+    draw_extras : callable or None
+        Called before each flip to render background (e.g. game frame + bar).
+    input_handler : InputHandler or None
+        If provided, polls for escape each frame.
+
+    Returns
+    -------
+    bool
+        True if escape was pressed.
+    """
+    if steps is None:
+        steps = ["3", "2", "1", "GO"]
+
+    stim = visual.TextStim(
+        win,
+        text="",
+        height=ACTION_FONT_SIZE * 2,
+        color=TEXT_COLOR,
+        font=DISPLAY_FONT,
+        units="pix",
+        bold=True,
+    )
+    for step_text in steps:
+        stim.text = step_text
+        timer = core.CountdownTimer(step_duration)
+        while timer.getTime() > 0:
+            if input_handler is not None and input_handler.check_escape():
+                return True
+            if draw_extras is not None:
+                draw_extras()
+            stim.draw()
+            win.flip()
+    return False
 
 
 def show_waiting_for_scanner(win):

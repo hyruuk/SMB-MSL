@@ -24,7 +24,8 @@ from smb_ssl_task.config import (
     SCAN_POINTS_CORRECT,
     SCAN_POINTS_ERROR,
 )
-from smb_ssl_task.scenes import get_scenes, get_canonical_sequence, get_canonical_sequence_source
+from smb_ssl_task.config import verbose
+from smb_ssl_task.scenes import get_scenes, get_canonical_sequence, get_canonical_sequence_source, get_clip_savestate_path
 from smb_ssl_task.msp import (
     ActionSequenceDisplay,
     collect_msp_scan_execution,
@@ -101,7 +102,8 @@ def _run_single_run_msp(win, input_handler, seq_display, pacing_line,
         target_symbols = [s for s, _ in action_seq]
         source_clip = get_canonical_sequence_source(scene_id)
         condition = "trained" if scene_id in trained_ids else "untrained"
-        print(f"[MSP] Run {run_number} | Scene: {scene_id} | Source: {source_clip or 'placeholder'} | Sequence: {' '.join(target_symbols)}")
+        if verbose():
+            print(f"[MSP] Run {run_number} | Scene: {scene_id} | BK2: {source_clip or 'placeholder'} | Sequence: {' '.join(target_symbols)}")
 
         # --- PREP phase: show sequence ---
         seq_display.show(action_seq)
@@ -190,6 +192,13 @@ def _run_single_run_gameplay(win, input_handler, engine,
         scene_info = all_scenes[scene_id]
         condition = "trained" if scene_id in trained_ids else "untrained"
 
+        # Select a BK2 clip and get matching savestate
+        action_seq = get_canonical_sequence(scene_id)
+        source_clip = get_canonical_sequence_source(scene_id)
+        clip_state = get_clip_savestate_path(scene_id)
+        if verbose():
+            print(f"[GAMEPLAY] Run {run_number} | Scene: {scene_id} | BK2: {source_clip or 'placeholder'}")
+
         # --- PREP phase: brief fixation ---
         prep_timer = core.CountdownTimer(SCAN_PREP_DURATION)
         while prep_timer.getTime() > 0:
@@ -198,7 +207,7 @@ def _run_single_run_gameplay(win, input_handler, engine,
             win.flip()
 
         # --- Load and execute gameplay ---
-        engine.load_scene(scene_id, scene_info)
+        engine.load_scene(scene_id, scene_info, state_path=clip_state)
         result = execute_gameplay_scan_trial(
             win, input_handler, engine, scene_info,
             duration=SCAN_EXECUTION_DURATION,

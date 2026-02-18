@@ -85,6 +85,11 @@ INTER_EXECUTION_INTERVAL = 0.5 # pause between execution 1 and 2 within a trial
 INTER_TRIAL_INTERVAL = 1.0     # pause between trials
 FEEDBACK_DURATION = 0.8        # how long to show points after a trial
 GAMEPLAY_MAX_DURATION = 10.0   # max seconds per gameplay attempt
+FIXATION_DURATION = 2.0        # fixation cross before preview
+COUNTDOWN_STEPS = ["3", "2", "1", "GO"]
+COUNTDOWN_STEP_DURATION = 0.75  # seconds per countdown step
+GAMEPLAY_BAR_Y_BASE = -300      # y position for overlay bar in gameplay mode
+GAMEPLAY_BAR_FONT_SIZE = 28     # smaller font for gameplay overlay
 
 # --- Training parameters ---
 TRAINING_TRIALS_PER_BLOCK = 24  # 6 scenes x 4 reps
