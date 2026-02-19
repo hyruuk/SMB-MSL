@@ -181,7 +181,7 @@ Bridges naturalistic Super Mario Bros. gameplay with the motor sequence learning
 Two modes of operation:
 
 - **MSP mode** (Motor Sequence Production) — Canonical button sequences extracted from BK2 replay files are presented as abstract NES button-chord sequences with duration bars. The player reproduces them by pressing the correct button combinations for the correct duration (analogous to the Berlot digit task, but with NES button chords and timing).
-- **Gameplay mode** — Loads SMB savestates via gym-retro. The player actually plays the scenes in real time.
+- **Gameplay mode** — Loads SMB savestates via gym-retro. The player actually plays the scenes in real time. Death detection (enemy hits, falls) immediately interrupts the current execution.
 
 ### Retro integration setup (gameplay mode)
 
@@ -197,6 +197,8 @@ Gameplay mode requires a **retro integration directory** — a folder that conta
     ├── rom.sha            # ROM hash
     └── *.state            # Savestate files
 ```
+
+The `data.json` must define at least `xscrollHi`, `xscrollLo`, `player_state`, and `lives` as RAM variables. Death detection relies on `player_state` transitioning to 11 (dying animation) and on `lives` decreasing (fall deaths). The CNeuroMod `mario.stimuli` integration provides all required variables.
 
 On the first run, enter the path to the directory that *contains* `SuperMarioBros-Nes/` (not the `SuperMarioBros-Nes/` folder itself) in the **Retro integration dir** field of the GUI dialog. This path is saved to `.smb_ssl_settings.json` and will be pre-filled on subsequent runs.
 
@@ -222,7 +224,10 @@ A GUI dialog will prompt you for:
 | **Session type** | `training`, `test`, `scan_paced`, `scan_fullspeed`, or `pretrain` |
 | **Session number** | Integer session index |
 | **Blocks / Reps** | Number of blocks (training) or reps per scene (test) |
+| **Screen resolution** | Display resolution in WxH pixels (auto-detected) |
+| **Scenes dataset dir** | Path to the `mario.scenes` dataset root (saved across runs) |
 | **Retro integration dir** | Directory containing `SuperMarioBros-Nes/` (gameplay mode only, saved across runs) |
+| **Advanced mode** | Opens an extended configuration panel (see below) |
 
 ### Session types
 
@@ -239,6 +244,28 @@ Adaptive reward system: 0 points (error/slow), 1 point (correct), 3 points (corr
 **Scan session — paced** (`scan_paced`) — 8 functional runs for fMRI. 12 scenes x 6 reps = 72 trials per run, arranged as consecutive pairs. Each trial: 1s prep + 5s execution + 0.5s ITI. Expanding pacing line in MSP mode. 5 rest periods (10s fixation) per run. Waits for scanner trigger (`=` key) before each run.
 
 **Scan session — full speed** (`scan_fullspeed`) — Same structure but with a short static go-cue instead of the expanding pacing line.
+
+### Advanced mode
+
+When **Advanced mode** is checked, a comprehensive configuration panel opens before the session starts. All parameters are pre-populated with their current defaults; the user only changes what they need.
+
+**Dialog 1 — Configuration overrides:**
+
+| Section | Fields |
+|---------|--------|
+| **Scene / Clip** | Scene ID filter, Subject filter, Outcome filter, Clip min duration, Clip min/max elements |
+| **Timing** | Execution timeout, Inter-execution/trial intervals, Feedback duration, Gameplay max duration, Fixation duration, Countdown step duration, Speed factor |
+| **Training** | Reps per sequence, Pretrain reps per scene, Error rate threshold, Fast bonus fraction |
+| **Scanner** | Prep duration, Execution duration, ITI, Reps per sequence, Number of runs, Rest periods/duration |
+| **Behavior** | Repeat until passed |
+
+Any changed values override the corresponding `config.py` constant for that session (propagated to all loaded modules at startup via `config.apply_overrides()`).
+
+**Speed factor** — Controls emulator playback speed for both the BK2 preview replay and the player's gameplay execution (1.0 = real-time, 0.5 = half speed, 2.0 = double speed). Useful for piloting or debugging. Must not be 0.
+
+**Repeat until passed** — When enabled, each trial loops until the participant completes it successfully (accuracy_trial = 1). The `repeat_attempt` column in the TSV tracks the attempt number.
+
+**Dialog 2 — Clip selection (optional):** Only shown when a Scene ID filter is set and the scenes dataset is valid. Allows selecting a specific BK2 clip from the dataset, which overrides the default canonical sequence for that scene.
 
 ### Action vocabulary
 
@@ -314,6 +341,9 @@ Data is saved to `data/` with the same directory structure as the Berlot task. E
 | `traversal_time` | Scene traversal time in seconds (gameplay) |
 | `distance_reached` | Fraction of scene traversed, 0.0–1.0 (gameplay) |
 | `points_awarded` | Points for this execution |
+| `advanced_mode` | Whether advanced mode was active (`True`/`False`) |
+| `source_bk2` | Path to the selected BK2 clip (advanced mode) or `NA` |
+| `repeat_attempt` | Attempt number within a trial (1 normally, >1 with repeat-until-passed) |
 
 Columns not applicable to the current mode are filled with `NA`.
 
@@ -323,12 +353,15 @@ Edit `smb_ssl_task/config.py` to adjust:
 
 - Display settings (screen size, game render size, colors, font sizes)
 - Action display parameters (symbol spacing, feedback colors)
-- Timing parameters (timeouts, intervals, gameplay max duration)
+- Timing parameters (timeouts, intervals, gameplay max duration, speed factor)
 - Training parameters (trials per block, error threshold, point values)
 - Scanner settings (trigger key, trial timing, runs, rest periods)
 - Input mappings (keyboard and gamepad)
 - Duration bar appearance and timing tolerance
+- BK2 clip filtering (min/max elements, min duration, allowed symbols)
 - Path to the `mario.scenes` dataset (set in GUI)
+
+Alternatively, use **Advanced mode** in the GUI to override any config parameter for a single session without editing the file. Overrides are applied at startup via `config.apply_overrides()` and propagated to all loaded modules.
 
 ### BK2 parser
 
@@ -372,6 +405,7 @@ SMB-MSL/
     ├── __init__.py
     ├── __main__.py          # Entry point, GUI dialog, mode dispatch
     ├── config.py            # All parameters (display, timing, input, paths)
+    ├── advanced_gui.py      # Advanced mode: config overrides + clip selection dialogs
     ├── scenes.py            # Scene definitions, BK2 parser, action vocabulary
     ├── input_handler.py     # Unified keyboard/gamepad -> NES button mapping
     ├── data_logging.py      # TSV writer (MSP + gameplay columns)
