@@ -1,4 +1,4 @@
-# SMB-MSL: Motor Sequence Learning Tasks
+# SMB-MSL: Motor Sequence Learning Tasks (WiP - untested, do not use for research purpose)
 
 This repository contains two PsychoPy-based motor sequence learning tasks for the CNeuroMod project:
 
