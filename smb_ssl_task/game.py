@@ -610,6 +610,19 @@ def execute_gameplay_with_tracking(win, input_handler, engine, seq_display,
     next_step_time = start_time
     frame_counter = 0
 
+    # Sample the starting x so we can ignore exit_x values that are at or
+    # behind the player at spawn (e.g., very short placeholder sequences
+    # where the preview barely scrolled). The minimum completion frame
+    # count below also guards against unrealistically tight exit_x values.
+    start_player_x = engine.get_player_x()
+    # Grace frames: ignore death/completion for the first ~0.5s — protects
+    # against first-frame transients after env reset and against exit_x
+    # values that fire before the player has had time to play.
+    GRACE_FRAMES = 30
+    # Require at least half the preview's frame budget (clamped to >=60
+    # frames / 1s) before "completed" can fire, regardless of exit_x.
+    min_completion_frames = max(60, total_target_frames // 2)
+
     # Per-element tracking (same pattern as MSP's _run_continuous_timeline)
     elem_chord_times = [defaultdict(float) for _ in range(n_elements)]
     elem_dominant = [set() for _ in range(n_elements)]
@@ -621,6 +634,9 @@ def execute_gameplay_with_tracking(win, input_handler, engine, seq_display,
 
         if elapsed >= max_duration:
             outcome = "timeout"
+            if verbose():
+                print(f"  [EXEC end] timeout | elapsed={elapsed:.2f}s "
+                      f"| max_duration={max_duration:.2f}s | frame={frame_counter}")
             break
 
         if input_handler.check_escape():
@@ -667,14 +683,26 @@ def execute_gameplay_with_tracking(win, input_handler, engine, seq_display,
 
             prev_elem_idx = ei
 
-            # Check exit conditions
+            # Check exit conditions (after the grace period — first frames
+            # after env.reset can briefly carry weird state that would
+            # otherwise mis-trigger death or instant completion).
             player_x = engine.get_player_x(info)
-            if player_x >= exit_x:
-                outcome = "completed"
-                break
-            if engine.is_death(info):
-                outcome = "death"
-                break
+            if frame_counter >= GRACE_FRAMES:
+                if (player_x >= exit_x
+                        and player_x > start_player_x
+                        and frame_counter >= min_completion_frames):
+                    outcome = "completed"
+                    if verbose():
+                        print(f"  [EXEC end] completed | frame={frame_counter} "
+                              f"| player_x={player_x} >= exit_x={exit_x} "
+                              f"| start_x={start_player_x}")
+                    break
+                if engine.is_death(info):
+                    outcome = "death"
+                    if verbose():
+                        print(f"  [EXEC end] death | frame={frame_counter} "
+                              f"| player_x={player_x} | exit_x={exit_x}")
+                    break
 
         # Render
         engine.render()

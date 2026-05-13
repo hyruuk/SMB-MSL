@@ -13,6 +13,15 @@ dependencies = [
     "psychopy>=2024.1.0",
     "stable-retro>=0.9.2",
     "numpy>=1.24",
+    # psychopy doesn't pin a scipy floor; resolver picks scipy 1.6.1
+    # which still uses distutils (removed in Python 3.12). 1.11 is the
+    # first scipy with full Py3.12 support.
+    "scipy>=1.11",
+    # Pinned to the newest wxPython that has prebuilt Linux wheels at
+    # https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ (4.2.5 only
+    # ships as an sdist there, which needs system GTK dev headers to build).
+    # macOS/Windows wheels for 4.2.2 exist on PyPI, so this pin is portable.
+    "wxpython==4.2.2",
     "datalad>=1.0",
     "tqdm>=4.0",
 ]

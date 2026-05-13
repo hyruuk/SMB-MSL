@@ -3,6 +3,10 @@ env/
 venv/
 .venv/
 
+# uv lock — regenerated per-machine by setup.sh because the wxPython
+# wheel URL it pins is distro-specific (Ubuntu/Debian/Fedora variant).
+uv.lock
+
 # Python
 __pycache__/
 *.py[cod]

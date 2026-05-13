@@ -177,20 +177,13 @@ def scan_dataset(scenes_path):
 # Dialog builders
 # ---------------------------------------------------------------------------
 
-def _build_config_dialog(dataset_index):
-    """Build Dialog 1 — comprehensive configuration.
+def _tab_specs(dataset_index):
+    """Return tab definitions for the tabbed advanced-config dialog.
 
-    Parameters
-    ----------
-    dataset_index : dict or None
-        Output of ``scan_dataset()`` if the scenes path is valid, else None.
-
-    Returns
-    -------
-    (dict, list)
-        The dialog dictionary and the field order list.
+    Each entry is ``(tab_title, [field_spec, ...])`` where ``field_spec`` is
+    ``(label, kind, default, choices_or_None, tip)`` with ``kind`` one of
+    ``"choice" | "bool" | "float" | "int"``.
     """
-    # --- Scene / Clip filter dropdowns ---
     if dataset_index is not None:
         scene_choices = ["(All)"] + dataset_index["scene_ids"]
         subject_choices = ["(All)"] + dataset_index["subjects"]
@@ -200,75 +193,159 @@ def _build_config_dialog(dataset_index):
         subject_choices = ["(All)"]
         outcome_choices = ["(All)"]
 
-    dlg_dict = {
-        # Scene / Clip
-        "Scene ID":                     scene_choices,
-        "Subject filter":               subject_choices,
-        "Outcome filter":               outcome_choices,
-        "Clip min duration (s)":        config.CLIP_MIN_DURATION_SEC,
-        "Clip min elements":            config.CLIP_MIN_ELEMENTS,
-        "Clip max elements":            config.CLIP_MAX_ELEMENTS,
-        # Timing
-        "Execution timeout (s)":        config.EXECUTION_TIMEOUT,
-        "Inter-execution interval (s)": config.INTER_EXECUTION_INTERVAL,
-        "Inter-trial interval (s)":     config.INTER_TRIAL_INTERVAL,
-        "Feedback duration (s)":        config.FEEDBACK_DURATION,
-        "Gameplay max duration (s)":    config.GAMEPLAY_MAX_DURATION,
-        "Fixation duration (s)":        config.FIXATION_DURATION,
-        "Countdown step duration (s)":  config.COUNTDOWN_STEP_DURATION,
-        "Speed factor":                 config.SPEED_FACTOR,
-        # Training
-        "Training reps per sequence":   config.TRAINING_REPS_PER_SEQ,
-        "Pretrain reps per scene":      config.PRETRAIN_REPS_PER_SCENE,
-        "Error rate threshold":         config.ERROR_RATE_THRESHOLD,
-        "Fast bonus fraction":          config.FAST_BONUS_FRACTION,
-        # Scanner
-        "Scan prep duration (s)":       config.SCAN_PREP_DURATION,
-        "Scan execution duration (s)":  config.SCAN_EXECUTION_DURATION,
-        "Scan ITI (s)":                 config.SCAN_ITI,
-        "Scan reps per sequence":       config.SCAN_REPS_PER_SEQ,
-        "Scan number of runs":          config.SCAN_N_RUNS,
-        "Scan rest periods":            config.SCAN_REST_PERIODS,
-        "Scan rest duration (s)":       config.SCAN_REST_DURATION,
-        # Behavior
-        "Repeat until passed":          False,
-    }
+    c = config
 
-    order = [
-        # Scene / Clip
-        "Scene ID",
-        "Subject filter",
-        "Outcome filter",
-        "Clip min duration (s)",
-        "Clip min elements",
-        "Clip max elements",
-        # Timing
-        "Execution timeout (s)",
-        "Inter-execution interval (s)",
-        "Inter-trial interval (s)",
-        "Feedback duration (s)",
-        "Gameplay max duration (s)",
-        "Fixation duration (s)",
-        "Countdown step duration (s)",
-        "Speed factor",
-        # Training
-        "Training reps per sequence",
-        "Pretrain reps per scene",
-        "Error rate threshold",
-        "Fast bonus fraction",
-        # Scanner
-        "Scan prep duration (s)",
-        "Scan execution duration (s)",
-        "Scan ITI (s)",
-        "Scan reps per sequence",
-        "Scan number of runs",
-        "Scan rest periods",
-        "Scan rest duration (s)",
-        # Behavior
-        "Repeat until passed",
+    return [
+        ("Scene / Clip", [
+            ("Scene ID", "choice", scene_choices[0], scene_choices,
+                "Filter clips by scene (e.g. w1l1s3)"),
+            ("Subject filter", "choice", subject_choices[0], subject_choices,
+                "Filter clips by subject (e.g. sub-01)"),
+            ("Outcome filter", "choice", outcome_choices[0], outcome_choices,
+                "Filter by clip outcome (completed/death)"),
+            ("Clip min duration (s)", "float", c.CLIP_MIN_DURATION_SEC, None,
+                f"Default: {c.CLIP_MIN_DURATION_SEC}"),
+            ("Clip min elements", "int", c.CLIP_MIN_ELEMENTS, None,
+                f"Default: {c.CLIP_MIN_ELEMENTS}"),
+            ("Clip max elements", "int", c.CLIP_MAX_ELEMENTS, None,
+                f"Default: {c.CLIP_MAX_ELEMENTS}"),
+        ]),
+        ("Timing", [
+            ("Execution timeout (s)", "float", c.EXECUTION_TIMEOUT, None,
+                f"Default: {c.EXECUTION_TIMEOUT}"),
+            ("Inter-execution interval (s)", "float", c.INTER_EXECUTION_INTERVAL,
+                None, f"Default: {c.INTER_EXECUTION_INTERVAL}"),
+            ("Inter-trial interval (s)", "float", c.INTER_TRIAL_INTERVAL, None,
+                f"Default: {c.INTER_TRIAL_INTERVAL}"),
+            ("Feedback duration (s)", "float", c.FEEDBACK_DURATION, None,
+                f"Default: {c.FEEDBACK_DURATION}"),
+            ("Gameplay max duration (s)", "float", c.GAMEPLAY_MAX_DURATION, None,
+                f"Default: {c.GAMEPLAY_MAX_DURATION}"),
+            ("Fixation duration (s)", "float", c.FIXATION_DURATION, None,
+                f"Default: {c.FIXATION_DURATION}"),
+            ("Countdown step duration (s)", "float", c.COUNTDOWN_STEP_DURATION,
+                None, f"Default: {c.COUNTDOWN_STEP_DURATION}"),
+            ("Speed factor", "float", c.SPEED_FACTOR, None,
+                "Playback speed (1.0 = real-time, 0.5 = half speed). Must not be 0."),
+        ]),
+        ("Training", [
+            ("Training reps per sequence", "int", c.TRAINING_REPS_PER_SEQ, None,
+                f"Default: {c.TRAINING_REPS_PER_SEQ}"),
+            ("Pretrain reps per scene", "int", c.PRETRAIN_REPS_PER_SCENE, None,
+                f"Default: {c.PRETRAIN_REPS_PER_SCENE}"),
+            ("Error rate threshold", "float", c.ERROR_RATE_THRESHOLD, None,
+                f"Default: {c.ERROR_RATE_THRESHOLD}"),
+            ("Fast bonus fraction", "float", c.FAST_BONUS_FRACTION, None,
+                f"Default: {c.FAST_BONUS_FRACTION}"),
+        ]),
+        ("Scanner", [
+            ("Scan prep duration (s)", "float", c.SCAN_PREP_DURATION, None,
+                f"Default: {c.SCAN_PREP_DURATION}"),
+            ("Scan execution duration (s)", "float", c.SCAN_EXECUTION_DURATION,
+                None, f"Default: {c.SCAN_EXECUTION_DURATION}"),
+            ("Scan ITI (s)", "float", c.SCAN_ITI, None,
+                f"Default: {c.SCAN_ITI}"),
+            ("Scan reps per sequence", "int", c.SCAN_REPS_PER_SEQ, None,
+                f"Default: {c.SCAN_REPS_PER_SEQ}"),
+            ("Scan number of runs", "int", c.SCAN_N_RUNS, None,
+                f"Default: {c.SCAN_N_RUNS}"),
+            ("Scan rest periods", "int", c.SCAN_REST_PERIODS, None,
+                f"Default: {c.SCAN_REST_PERIODS}"),
+            ("Scan rest duration (s)", "float", c.SCAN_REST_DURATION, None,
+                f"Default: {c.SCAN_REST_DURATION}"),
+        ]),
+        ("Behavior", [
+            ("Repeat until passed", "bool", False, None,
+                "Loop the trial until the participant passes"),
+        ]),
     ]
 
-    return dlg_dict, order
+
+_wx_app = None  # module-level reference to keep wx.App alive
+
+
+def _show_tabbed_config_dialog(dataset_index):
+    """Show the advanced-config dialog with a wx.Notebook of tabs.
+
+    Returns ``(values, ok)`` where ``values`` is ``{label: raw_value}`` for
+    every field (numbers come back as strings from TextCtrl; ``_collect_overrides``
+    coerces them) and ``ok`` is True iff the user clicked OK.
+    """
+    import wx
+    # Ensure a wx.App exists and stays alive. PsychoPy may have already
+    # created one; otherwise we create a minimal one and hold a module-level
+    # reference so it survives this function's stack frame.
+    global _wx_app
+    if not wx.GetApp():
+        _wx_app = wx.App(False)
+
+    tabs = _tab_specs(dataset_index)
+
+    dlg = wx.Dialog(
+        None,
+        title="Advanced Mode — Configuration",
+        style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+    )
+    notebook = wx.Notebook(dlg)
+    controls = {}  # field label -> wx control
+
+    for tab_title, fields in tabs:
+        panel = wx.Panel(notebook)
+        grid = wx.FlexGridSizer(rows=len(fields), cols=2, vgap=8, hgap=12)
+        grid.AddGrowableCol(1, 1)
+        for label, kind, default, choices, tip in fields:
+            lbl = wx.StaticText(panel, label=label)
+            if kind == "choice":
+                ctrl = wx.Choice(panel, choices=choices)
+                if default in choices:
+                    ctrl.SetStringSelection(default)
+                else:
+                    ctrl.SetSelection(0)
+            elif kind == "bool":
+                ctrl = wx.CheckBox(panel)
+                ctrl.SetValue(bool(default))
+            else:  # float / int — single-line TextCtrl
+                ctrl = wx.TextCtrl(panel, value=str(default))
+            if tip:
+                lbl.SetToolTip(tip)
+                ctrl.SetToolTip(tip)
+            grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+            grid.Add(ctrl, 1, wx.EXPAND)
+            controls[label] = ctrl
+        wrapper = wx.BoxSizer(wx.VERTICAL)
+        wrapper.Add(grid, 1, wx.EXPAND | wx.ALL, 14)
+        panel.SetSizer(wrapper)
+        notebook.AddPage(panel, tab_title)
+
+    btn_sizer = dlg.CreateButtonSizer(wx.OK | wx.CANCEL)
+
+    main = wx.BoxSizer(wx.VERTICAL)
+    main.Add(notebook, 1, wx.EXPAND | wx.ALL, 8)
+    main.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 8)
+    dlg.SetSizer(main)
+    dlg.Fit()
+    # Force the dialog wide enough for all tab labels in one row so wx
+    # doesn't fall back to scroll arrows on a narrow auto-fitted dialog.
+    w, h = dlg.GetSize()
+    # Estimate: ~100 px per tab label + 60 px margin (covers the 5 labels
+    # "Scene / Clip / Timing / Training / Scanner / Behavior").
+    min_w = max(w, 100 * notebook.GetPageCount() + 60)
+    dlg.SetSize((min_w, h))
+    dlg.SetMinSize((min_w, h))
+    dlg.Center()
+
+    ok = (dlg.ShowModal() == wx.ID_OK)
+
+    values = {}
+    for label, ctrl in controls.items():
+        if isinstance(ctrl, wx.Choice):
+            values[label] = ctrl.GetStringSelection()
+        elif isinstance(ctrl, wx.CheckBox):
+            values[label] = ctrl.GetValue()
+        else:
+            values[label] = ctrl.GetValue()
+    dlg.Destroy()
+    return values, ok
 
 
 def _collect_overrides(dlg_dict):
@@ -322,43 +399,9 @@ def run_advanced_dialogs(scenes_path):
         if dataset_index and not dataset_index["clips"]:
             dataset_index = None  # treat empty dataset same as missing
 
-    # --- Dialog 1: Advanced Configuration ---
-    dlg_dict, order = _build_config_dialog(dataset_index)
-
-    dlg1 = gui.DlgFromDict(
-        dictionary=dlg_dict,
-        title="Advanced Mode — Configuration",
-        order=order,
-        tip={
-            "Scene ID": "Filter clips by scene (e.g. w1l1s3)",
-            "Subject filter": "Filter clips by subject (e.g. sub-01)",
-            "Outcome filter": "Filter by clip outcome (completed/death)",
-            "Clip min duration (s)": f"Default: {config.CLIP_MIN_DURATION_SEC}",
-            "Clip min elements": f"Default: {config.CLIP_MIN_ELEMENTS}",
-            "Clip max elements": f"Default: {config.CLIP_MAX_ELEMENTS}",
-            "Execution timeout (s)": f"Default: {config.EXECUTION_TIMEOUT}",
-            "Inter-execution interval (s)": f"Default: {config.INTER_EXECUTION_INTERVAL}",
-            "Inter-trial interval (s)": f"Default: {config.INTER_TRIAL_INTERVAL}",
-            "Feedback duration (s)": f"Default: {config.FEEDBACK_DURATION}",
-            "Gameplay max duration (s)": f"Default: {config.GAMEPLAY_MAX_DURATION}",
-            "Fixation duration (s)": f"Default: {config.FIXATION_DURATION}",
-            "Countdown step duration (s)": f"Default: {config.COUNTDOWN_STEP_DURATION}",
-            "Speed factor": "Playback speed (1.0 = real-time, 0.5 = half speed). Must not be 0.",
-            "Training reps per sequence": f"Default: {config.TRAINING_REPS_PER_SEQ}",
-            "Pretrain reps per scene": f"Default: {config.PRETRAIN_REPS_PER_SCENE}",
-            "Error rate threshold": f"Default: {config.ERROR_RATE_THRESHOLD}",
-            "Fast bonus fraction": f"Default: {config.FAST_BONUS_FRACTION}",
-            "Scan prep duration (s)": f"Default: {config.SCAN_PREP_DURATION}",
-            "Scan execution duration (s)": f"Default: {config.SCAN_EXECUTION_DURATION}",
-            "Scan ITI (s)": f"Default: {config.SCAN_ITI}",
-            "Scan reps per sequence": f"Default: {config.SCAN_REPS_PER_SEQ}",
-            "Scan number of runs": f"Default: {config.SCAN_N_RUNS}",
-            "Scan rest periods": f"Default: {config.SCAN_REST_PERIODS}",
-            "Scan rest duration (s)": f"Default: {config.SCAN_REST_DURATION}",
-            "Repeat until passed": "Loop the trial until the participant passes",
-        },
-    )
-    if not dlg1.OK:
+    # --- Dialog 1: Advanced Configuration (tabbed) ---
+    dlg_dict, ok = _show_tabbed_config_dialog(dataset_index)
+    if not ok:
         return AdvancedConfig(enabled=False)
 
     # --- Collect overrides ---

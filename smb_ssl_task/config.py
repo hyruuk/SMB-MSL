@@ -83,14 +83,17 @@ SYMBOL_DISPLAY = {
 
 # --- Timing (seconds) ---
 EXECUTION_TIMEOUT = 30.0       # max time for one MSP execution
-INTER_EXECUTION_INTERVAL = 0.5 # pause between execution 1 and 2 within a trial
+INTER_EXECUTION_INTERVAL = 0.5 # pause between execution 1 and 2 within a trial (MSP)
 INTER_TRIAL_INTERVAL = 1.0     # pause between trials
 FEEDBACK_DURATION = 0.8        # how long to show points after a trial
 GAMEPLAY_MAX_DURATION = 10.0   # max seconds per gameplay attempt
 FIXATION_DURATION = 2.0        # fixation cross before preview
 COUNTDOWN_STEPS = ["3", "2", "1", "GO"]
 COUNTDOWN_STEP_DURATION = 0.75  # seconds per countdown step
-GAMEPLAY_BAR_Y_BASE = -300      # y position for overlay bar in gameplay mode
+# Timeline sits just below the game render (game bottom edge is at
+# -GAME_RENDER_SIZE[1] / 2 = -360 for 720px). The symbol top extends to
+# y_base + font/2; -410 leaves a ~36px gap above the symbols.
+GAMEPLAY_BAR_Y_BASE = -410      # y position for the bar timeline in gameplay mode
 GAMEPLAY_BAR_FONT_SIZE = 28     # smaller font for gameplay overlay
 SPEED_FACTOR = 1.0              # playback speed multiplier (1.0 = real-time)
 

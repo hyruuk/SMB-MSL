@@ -318,7 +318,7 @@ def run_training_session(win, input_handler, participant_id, group,
                                               input_handler=input_handler):
                             return
 
-                        # --- BK2 Preview Replay ---
+                        # --- BK2 Preview Replay (example) ---
                         engine.load_scene(scene_id, scene_info, state_path=clip_state)
                         preview_result = replay_bk2_preview(
                             win, input_handler, engine, seq_display, action_seq,
@@ -328,7 +328,9 @@ def run_training_session(win, input_handler, participant_id, group,
                             return
                         preview_exit_x = preview_result["exit_x"]
 
-                        # --- Countdown (overlaid on frozen game frame) ---
+                        # --- Reset scene + timeline + countdown before exec 1 ---
+                        engine.load_scene(scene_id, scene_info, state_path=clip_state)
+                        seq_display.reset()
                         def _draw_game_and_bar():
                             engine.render()
                             seq_display.draw()
@@ -342,7 +344,6 @@ def run_training_session(win, input_handler, participant_id, group,
                             return
 
                         # --- Execution 1: player plays with tracking ---
-                        engine.load_scene(scene_id, scene_info, state_path=clip_state)
                         exec1 = execute_gameplay_with_tracking(
                             win, input_handler, engine, seq_display,
                             action_seq, preview_exit_x,
@@ -369,13 +370,26 @@ def run_training_session(win, input_handler, participant_id, group,
                             repeat_attempt=repeat_attempt,
                         )
 
-                        # --- Inter-execution pause (escape-aware) ---
-                        if _wait_with_escape(win, input_handler,
-                                             INTER_EXECUTION_INTERVAL):
+                        # --- Feedback on exec 1 (same +N points style as exec 2) ---
+                        exec1_points = _compute_points_gameplay(exec1, mt_threshold)
+                        show_trial_points(win, exec1_points, FEEDBACK_DURATION)
+
+                        # --- Reset scene + timeline + countdown before exec 2 ---
+                        engine.load_scene(scene_id, scene_info, state_path=clip_state)
+                        seq_display.reset()
+                        def _draw_game_and_bar2():
+                            engine.render()
+                            seq_display.draw()
+                        if show_countdown(
+                            win,
+                            steps=COUNTDOWN_STEPS,
+                            step_duration=COUNTDOWN_STEP_DURATION,
+                            draw_extras=_draw_game_and_bar2,
+                            input_handler=input_handler,
+                        ):
                             return
 
                         # --- Execution 2: player plays from memory ---
-                        engine.load_scene(scene_id, scene_info, state_path=clip_state)
                         exec2 = execute_gameplay_with_tracking(
                             win, input_handler, engine, seq_display,
                             action_seq, preview_exit_x,

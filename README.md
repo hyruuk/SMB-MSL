@@ -15,13 +15,13 @@ Dependencies and the virtualenv are managed by [`uv`](https://docs.astral.sh/uv/
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Then, from the repository root:
+The recommended path on Linux is to run `./setup.sh` (see [step 3](#3-datasets-mariostimuli-and-marioscenes)): it auto-detects your distro, points `uv sync` at the matching prebuilt wxPython wheel index, and then installs the datalad datasets. If you only want the Python env without the data, the same `uv sync` call works on its own — but you'll need `--find-links` set to the right wxPython wheel index for your distro, e.g. Linux Mint 22 / Ubuntu 24.04:
 
 ```bash
-uv sync
+uv sync --find-links https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-24.04/
 ```
 
-This creates `.venv/` and installs everything declared in `pyproject.toml` (PsychoPy, stable-retro, NumPy, datalad, tqdm). Python 3.9+ is required; `uv` will fetch a matching interpreter if needed.
+This creates `.venv/` and installs everything declared in `pyproject.toml` (PsychoPy, stable-retro, NumPy, SciPy, wxPython, datalad, tqdm). Python 3.9+ is required; `uv` will fetch a matching interpreter if needed.
 
 Run anything in the project env with `uv run`:
 
@@ -30,16 +30,20 @@ uv run smb-ssl-task            # entry point
 uv run python -m smb_ssl_task  # equivalent
 ```
 
-#### Linux: wxPython wheel
+#### Why the wxPython find-links URL?
 
-PsychoPy needs wxPython, which has no Linux wheels on PyPI. If `uv sync` fails on `wxPython`, install the right wheel for your distro **into the project env**, then re-sync:
+PsychoPy needs wxPython, which has no Linux wheels on PyPI (it only ships there as an sdist that needs system GTK dev headers to build). The CNeuroMod-friendly path is the [wxPython extras index](https://extras.wxpython.org/wxPython4/extras/linux/gtk3/) — a per-distro directory of prebuilt wheels. `setup.sh` picks the right directory automatically; supported flavours are:
 
-```bash
-uv pip install https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-24.04/wxpython-4.2.5-cp310-cp310-linux_x86_64.whl
-uv sync --inexact   # don't prune the wxPython we just installed
-```
+| Distro family | URL fragment | Notes |
+|---|---|---|
+| Ubuntu (24.04 / 22.04 / 20.04) | `ubuntu-XX.XX` | Direct match |
+| Linux Mint, Pop!_OS, elementary, Zorin, KDE Neon, Tuxedo | `ubuntu-XX.XX` | Mapped via `UBUNTU_CODENAME` (noble → 24.04, jammy → 22.04, focal → 20.04) |
+| Debian (11 / 12) | `debian-XX` | Direct match |
+| Fedora (37 / 38) | `fedora-XX` | Direct match |
 
-> **Other distros / Python versions:** Browse the [wxPython extras index](https://extras.wxpython.org/wxPython4/extras/linux/gtk3/) and pick the wheel matching your distro and the Python `cpXYZ` tag (e.g., `cp311` for Python 3.11). If you get an `ImportError` about a missing `.so` file at runtime, install the matching system library (`apt search <name>`) or symlink the version you have to the one expected.
+If your distro isn't covered, browse the [extras index](https://extras.wxpython.org/wxPython4/extras/linux/gtk3/) for a compatible variant and pass it explicitly with `uv sync --find-links <URL>`. The current pin is `wxpython==4.2.2` (latest version available across all supported distro directories at time of writing).
+
+`uv.lock` is **not** committed because the wheel URL it pins is distro-specific; `setup.sh` regenerates it for each machine.
 
 If you manage PsychoPy separately (e.g., the standalone installer) and just want this repo importable on top of it, install without dependencies:
 
@@ -72,9 +76,10 @@ The task depends on two CNeuroMod datalad datasets:
 
 A helper script `setup.sh` provisions everything in one go:
 
-1. runs `uv sync` to create `.venv/` and install all Python deps (incl. `datalad` and `tqdm`),
-2. `datalad install` + `datalad get` for both datasets (via `uv run`),
-3. unpacks the per-session `gamelogs.tar` archives in `mario.scenes` using the dataset's own decompress script (via `uv run`).
+1. detects your Linux distro and picks the matching wxPython wheel index (see the table above),
+2. runs `uv sync --find-links <that-index>` to create `.venv/` and install all Python deps (incl. `datalad` and `tqdm`),
+3. `datalad install` for both datasets, then `datalad get` (via `uv run`) — the `mario.scenes` fetch is scoped to `sourcedata/scenes_info/` and `sub-*/ses-*/gamelogs.tar` so we skip the BIDS `func/` files (events/bold) the task doesn't use,
+4. unpacks the per-session `gamelogs.tar` archives in `mario.scenes` using the dataset's own decompress script (via `uv run`).
 
 ```bash
 ./setup.sh                  # interactive: prompts for a data root (default: repo root)

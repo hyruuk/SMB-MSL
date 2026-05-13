@@ -13,6 +13,9 @@ from smb_ssl_task.config import (
     PRETRAIN_REPS_PER_SCENE,
     INTER_EXECUTION_INTERVAL,
     INTER_TRIAL_INTERVAL,
+    COUNTDOWN_STEPS,
+    COUNTDOWN_STEP_DURATION,
+    FEEDBACK_DURATION,
     SPEED_FACTOR,
 )
 from smb_ssl_task.config import verbose
@@ -25,7 +28,9 @@ from smb_ssl_task.scenes import (
 )
 from smb_ssl_task.msp import ActionSequenceDisplay, collect_msp_execution
 from smb_ssl_task.game import execute_gameplay_trial
-from smb_ssl_task.display import show_instructions
+from smb_ssl_task.display import (
+    show_instructions, show_countdown, show_trial_points,
+)
 from smb_ssl_task.data_logging import DataLogger
 
 
@@ -231,11 +236,27 @@ def run_pretrain_session(win, input_handler, participant_id, group,
                         repeat_attempt=repeat_attempt,
                     )
 
-                    win.flip()
-                    core.wait(INTER_EXECUTION_INTERVAL)
+                    # --- Feedback on exec 1 (consistent +1/+0 form) ---
+                    show_trial_points(
+                        win,
+                        1 if exec1["outcome"] == "completed" else 0,
+                        FEEDBACK_DURATION,
+                    )
+
+                    # --- Reset scene + countdown before execution 2 ---
+                    engine.load_scene(scene_id, scene_info, state_path=clip_state)
+                    def _draw_game2():
+                        engine.render()
+                    if show_countdown(
+                        win,
+                        steps=COUNTDOWN_STEPS,
+                        step_duration=COUNTDOWN_STEP_DURATION,
+                        draw_extras=_draw_game2,
+                        input_handler=input_handler,
+                    ):
+                        return
 
                     # --- Execution 2: immediate replay (same savestate) ---
-                    engine.load_scene(scene_id, scene_info, state_path=clip_state)
                     exec2 = execute_gameplay_trial(
                         win, input_handler, engine, scene_info,
                         speed_factor=SPEED_FACTOR,
@@ -256,6 +277,13 @@ def run_pretrain_session(win, input_handler, participant_id, group,
                         advanced_mode=_adv,
                         source_bk2=_adv_bk2,
                         repeat_attempt=repeat_attempt,
+                    )
+
+                    # --- Feedback on exec 2 (consistent +1/+0 form) ---
+                    show_trial_points(
+                        win,
+                        1 if exec2["outcome"] == "completed" else 0,
+                        FEEDBACK_DURATION,
                     )
 
                     # Check pass criterion
