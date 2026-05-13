@@ -2,7 +2,6 @@
 Shared display functions for the SMB SSL task.
 
 Instruction screens, feedback, rest screens, and scan-session displays.
-Mirrors the Berlot task display patterns.
 """
 
 from psychopy import visual, event, core
@@ -22,7 +21,7 @@ from smb_ssl_task.config import (
 )
 
 
-# --- Pacing line (reused from Berlot pattern) ---
+# --- Pacing line ---
 
 class PacingLine:
     """Expanding pink line under the action symbols for paced scan sessions.

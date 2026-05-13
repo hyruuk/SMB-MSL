@@ -6,7 +6,7 @@ import sys
 
 # --- Paths ---
 GAME_NAME = "SuperMarioBros-Nes"
-SETTINGS_FILE = ".smb_ssl_settings.json"  # Persistent settings (next to data/)
+SETTINGS_FILE = ".smb_ssl_settings.json"  # Persistent settings (next to output/)
 
 # --- Display ---
 FULLSCREEN = True
@@ -106,7 +106,7 @@ POINTS_FAST = 3
 # --- Scanner settings ---
 SCANNER_TRIGGER_KEY = "equal"  # '=' key
 SCAN_PREP_DURATION = 1.0
-SCAN_EXECUTION_DURATION = 5.0  # wider than Berlot (3.5s) for gameplay
+SCAN_EXECUTION_DURATION = 5.0  # wide enough for gameplay traversal
 SCAN_ITI = 0.5
 SCAN_TRIAL_DURATION = SCAN_PREP_DURATION + SCAN_EXECUTION_DURATION + SCAN_ITI
 SCAN_REPS_PER_SEQ = 6
@@ -143,7 +143,7 @@ PRETRAIN_N_SCENES = 6
 PRETRAIN_REPS_PER_SCENE = 4
 
 # --- Data output ---
-DATA_DIR = "data"
+DATA_DIR = "output"
 TSV_SEPARATOR = "\t"
 
 # --- Escape ---

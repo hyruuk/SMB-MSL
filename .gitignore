@@ -12,7 +12,12 @@ build/
 *.egg
 
 # Data output (participant data)
+output/
 data/
+
+# Datalad sibling datasets (installed by setup.sh)
+mario.stimuli/
+mario.scenes/
 
 # IDE / editor
 .vscode/

@@ -1,35 +1,53 @@
-# SMB-MSL: Motor Sequence Learning Tasks (WiP - untested, do not use for research purpose)
+# SMB-MSL: Motor Sequence Learning Task (WiP — untested, do not use for research purpose)
 
-This repository contains two PsychoPy-based motor sequence learning tasks for the CNeuroMod project:
+PsychoPy implementation of the **SMB Scene Sequence Learning (SSL) task** — a naturalistic motor sequence learning paradigm built on Super Mario Bros. scenes from the CNeuroMod `mario.scenes` dataset. The task ships in two modes:
 
-1. **Berlot DSP Task** (`berlot2020_task/`) — Digit sequence production task from Berlot et al. (2020)
-2. **SMB Scene Sequence Learning Task** (`smb_ssl_task/`) — Naturalistic sequence learning using Super Mario Bros. scenes
-
-Both tasks share a common experimental structure (training with adaptive rewards, behavioral tests, fMRI scan sessions) but differ in the motor sequences used: abstract digit sequences vs. NES button-chord sequences derived from Mario gameplay.
+- **MSP mode** (Motor Sequence Production) — canonical button sequences extracted from BK2 replay files are presented as abstract NES button-chord sequences with per-element duration bars. The player reproduces them by pressing the correct button combinations for the correct duration.
+- **Gameplay mode** — loads SMB savestates via `stable-retro`. The player actually plays the scenes in real time. Death detection (enemy hits, falls) immediately interrupts the current execution.
 
 ## Installation
 
-```bash
-pip install --upgrade pip
-```
+### 1. Python environment with `uv`
 
-Requires Python 3.9+ and PsychoPy. The SMB-SSL task additionally requires `stable-retro` and `numpy` for gameplay mode.
-
-PsychoPy requires wxPython, which might not install cleanly on Linux.
-
-For Ubuntu 24.04 / Linux Mint 22 (Python 3.10):
-```bash
-pip install https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-24.04/wxpython-4.2.5-cp310-cp310-linux_x86_64.whl
-```
-
-> **Other setups:** The URL encodes your distro version and Python version. Browse the [wxPython extras index](https://extras.wxpython.org/wxPython4/extras/linux/gtk3/) to find the wheel matching your OS, then pick the file whose `cpXYZ` tag matches your Python (e.g., `cp311` for Python 3.11). If you get an `ImportError` about a missing `.so` file at runtime, install the corresponding system library (`apt search <name>`) or create a symlink from the version you have to the one expected.
+Dependencies and the virtualenv are managed by [`uv`](https://docs.astral.sh/uv/). Install it once:
 
 ```bash
-# From the repository root
-pip install -e .
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Linux: realtime scheduling permissions
+Then, from the repository root:
+
+```bash
+uv sync
+```
+
+This creates `.venv/` and installs everything declared in `pyproject.toml` (PsychoPy, stable-retro, NumPy, datalad, tqdm). Python 3.9+ is required; `uv` will fetch a matching interpreter if needed.
+
+Run anything in the project env with `uv run`:
+
+```bash
+uv run smb-ssl-task            # entry point
+uv run python -m smb_ssl_task  # equivalent
+```
+
+#### Linux: wxPython wheel
+
+PsychoPy needs wxPython, which has no Linux wheels on PyPI. If `uv sync` fails on `wxPython`, install the right wheel for your distro **into the project env**, then re-sync:
+
+```bash
+uv pip install https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-24.04/wxpython-4.2.5-cp310-cp310-linux_x86_64.whl
+uv sync --inexact   # don't prune the wxPython we just installed
+```
+
+> **Other distros / Python versions:** Browse the [wxPython extras index](https://extras.wxpython.org/wxPython4/extras/linux/gtk3/) and pick the wheel matching your distro and the Python `cpXYZ` tag (e.g., `cp311` for Python 3.11). If you get an `ImportError` about a missing `.so` file at runtime, install the matching system library (`apt search <name>`) or symlink the version you have to the one expected.
+
+If you manage PsychoPy separately (e.g., the standalone installer) and just want this repo importable on top of it, install without dependencies:
+
+```bash
+uv pip install -e . --no-deps
+```
+
+### 2. Linux: realtime scheduling permissions
 
 PsychoPy's keyboard backend (PsychToolbox) requires realtime thread scheduling. Without it the task will crash with a segfault. Run the following once, then **log out and back in**:
 
@@ -43,176 +61,53 @@ sudo tee /etc/security/limits.d/99-psychopy.conf > /dev/null << 'EOF'
 EOF
 ```
 
-If you manage PsychoPy separately (e.g., standalone installer), you can install without dependencies:
+### 3. Datasets (`mario.stimuli` and `mario.scenes`)
+
+The task depends on two CNeuroMod datalad datasets:
+
+| Dataset | Purpose |
+|---|---|
+| [`courtois-neuromod/mario.stimuli`](https://github.com/courtois-neuromod/mario.stimuli) | NES ROM + `stable-retro` integration metadata (the **Retro integration dir** in the GUI) |
+| [`courtois-neuromod/mario.scenes`](https://github.com/courtois-neuromod/mario.scenes) | Per-session gameplay archives (the **Scenes dataset dir** in the GUI) |
+
+A helper script `setup.sh` provisions everything in one go:
+
+1. runs `uv sync` to create `.venv/` and install all Python deps (incl. `datalad` and `tqdm`),
+2. `datalad install` + `datalad get` for both datasets (via `uv run`),
+3. unpacks the per-session `gamelogs.tar` archives in `mario.scenes` using the dataset's own decompress script (via `uv run`).
 
 ```bash
-pip install -e . --no-deps
+./setup.sh                  # interactive: prompts for a data root (default: repo root)
+./setup.sh /path/to/root    # non-interactive
 ```
+
+Requirements: `uv` and `git` on PATH, plus SSH access to `github.com:courtois-neuromod` (these datasets are released under CNeuroMod's data-sharing terms; request access if needed).
+
+After the script finishes you'll have:
+
+```
+<DATA_ROOT>/
+├── mario.stimuli/                 # ROM + integration files
+│   └── SuperMarioBros-Nes/        # used as the "Retro integration dir"
+└── mario.scenes/                  # scene gamelogs (unpacked)
+    └── sub-XX/ses-YYY/gamelogs/
+```
+
+Both paths are then entered once in the GUI (see below) and persisted in `.smb_ssl_settings.json`.
 
 ---
 
-## Task 1: Berlot DSP Task
-
-PsychoPy implementation of the discrete sequence production (DSP) task from:
-
-> Berlot, E., Popp, N. J., & Diedrichsen, J. (2020). A critical re-evaluation of fMRI signatures of motor sequence learning. *eLife*, 9, e55241.
-
-### Running the task
+## Running the task
 
 ```bash
-# As a module
-python -m berlot2020_task
+# Via the installed entry point
+uv run smb-ssl-task
 
-# Or via the installed entry point
-berlot2020-task
+# Or as a module
+uv run python -m smb_ssl_task
 ```
 
-A GUI dialog will prompt you for:
-
-| Field | Description |
-|---|---|
-| **Participant ID** | String identifier (e.g., `01`, `sub-02`) |
-| **Group** | `1` or `2` — determines which 6 sequences are trained vs. untrained |
-| **Session type** | `training`, `test`, `test_left`, `scan_paced`, `scan_fullspeed`, or `pretrain` |
-| **Session number** | Integer session index |
-| **Blocks / Reps** | Number of blocks (training), reps per sequence (test), or ignored (scan/pretrain) |
-
-### Session types
-
-**Pre-training** (`pretrain`) — Familiarization with the apparatus. Uses 6 random sequences not in the experimental set. Same self-paced trial structure as the behavioral test (digits visible, no points).
-
-**Training** (`training`) — 6 trained sequences, blocks of 24 trials (4 reps per sequence). Each trial has two executions: first with digits visible, then from memory. An adaptive reward system awards 0, 1, or 3 points based on accuracy and speed.
-
-**Behavioral test** (`test`) — All 12 sequences (6 trained + 6 untrained) intermixed. Digits remain visible for both executions. No points system.
-
-**Left-hand transfer test** (`test_left`) — Trained sequences only, played with the left hand. Includes intrinsically-matched trials (same finger sequence) and extrinsically-matched trials (mirrored fingers: finger N becomes finger 6-N). No points system.
-
-**Scan session — paced** (`scan_paced`) — 8 functional runs for fMRI scanning (scans 1–3). All 12 sequences, each repeated 6 times per run (72 trials). Sequences appear in consecutive pairs. Each trial lasts exactly 5s: 1s preparation, 3.5s execution with expanding pink pacing line, 0.5s ITI. Points: +3 correct, +0 error. 5 rest periods (10s fixation) per run. Waits for scanner trigger (`=` key) before each run.
-
-**Scan session — full speed** (`scan_fullspeed`) — Same as paced but with a short static go-cue instead of the expanding pacing line (scan 4). Execute as fast as possible.
-
-### Key mapping
-
-**Right hand** (training, test, scan, pretrain):
-
-| Finger | Key | Digit |
-|---|---|---|
-| Thumb | `Space` | 1 |
-| Index | `J` | 2 |
-| Middle | `K` | 3 |
-| Ring | `L` | 4 |
-| Pinky | `;` | 5 |
-
-**Left hand** (test_left):
-
-| Finger | Key | Digit |
-|---|---|---|
-| Thumb | `Space` | 1 |
-| Index | `F` | 2 |
-| Middle | `D` | 3 |
-| Ring | `S` | 4 |
-| Pinky | `A` | 5 |
-
-Press `Escape` at any time to abort the session (data collected so far is saved).
-
-### Berlot output
-
-Data is saved to `data/` in the working directory:
-
-```
-data/
-└── sub-01/
-    ├── training/
-    │   └── sub-01_training_ses-01.tsv
-    ├── test/
-    │   └── sub-01_test_ses-01.tsv
-    ├── test_left/
-    │   └── sub-01_test_left_ses-01.tsv
-    ├── pretrain/
-    │   └── sub-01_pretrain_ses-01.tsv
-    ├── scan_paced/
-    │   └── sub-01_scan_paced_ses-01.tsv
-    └── scan_fullspeed/
-        └── sub-01_scan_fullspeed_ses-01.tsv
-```
-
-Each TSV file has one row per **execution** (2 rows per trial) with the following columns:
-
-| Column | Description |
-|---|---|
-| `participant_id` | Participant identifier |
-| `group` | Group assignment (1 or 2) |
-| `session_type` | `training`, `test`, `test_left`, `pretrain`, `scan_paced`, or `scan_fullspeed` |
-| `session_number` | Session index |
-| `block_number` | Block number (1 for test/scan sessions) |
-| `run_number` | Functional run number (scan sessions) or 0 |
-| `trial_number` | Global trial counter |
-| `sequence_id` | Sequence identifier (1–12 experimental, 101+ pretrain) |
-| `sequence_digits` | Target sequence (semicolon-separated) |
-| `execution_number` | 1 or 2 |
-| `hand` | `right` or `left` |
-| `condition` | `trained`, `untrained`, `intrinsic`, `extrinsic`, or `pretrain` |
-| `response_keys` | Keys pressed (semicolon-separated) |
-| `response_times` | Press timestamps in seconds (semicolon-separated) |
-| `accuracy_per_press` | 1/0 per position (semicolon-separated) |
-| `accuracy_trial` | 1 if all presses correct, else 0 |
-| `movement_time` | Time from first to last keypress (seconds) |
-| `inter_press_intervals` | Intervals between consecutive presses (semicolon-separated) |
-| `points_awarded` | Points for this execution (training/scan) or 0 |
-
-### Berlot configuration
-
-Edit `berlot2020_task/config.py` to adjust:
-
-- Display settings (screen size, fullscreen, colors, font sizes)
-- Timing parameters (timeouts, inter-trial intervals, scan trial timing)
-- Training parameters (trials per block, error threshold, point values)
-- Key mappings (right and left hand)
-- Scanner settings (trigger key, TR)
-- Pacing line appearance (color, height, position)
-- Pre-training parameters (number of sequences, repetitions)
-
----
-
-## Task 2: SMB Scene Sequence Learning (SSL) Task
-
-Bridges naturalistic Super Mario Bros. gameplay with the motor sequence learning literature. Uses scene segments from the CNeuroMod `mario.scenes` dataset.
-
-Two modes of operation:
-
-- **MSP mode** (Motor Sequence Production) — Canonical button sequences extracted from BK2 replay files are presented as abstract NES button-chord sequences with duration bars. The player reproduces them by pressing the correct button combinations for the correct duration (analogous to the Berlot digit task, but with NES button chords and timing).
-- **Gameplay mode** — Loads SMB savestates via gym-retro. The player actually plays the scenes in real time. Death detection (enemy hits, falls) immediately interrupts the current execution.
-
-### Retro integration setup (gameplay mode)
-
-Gameplay mode requires a **retro integration directory** — a folder that contains a `SuperMarioBros-Nes/` subfolder with the ROM and game metadata. The expected structure is:
-
-```
-/path/to/your/integration_dir/
-└── SuperMarioBros-Nes/
-    ├── rom.nes            # The NES ROM file
-    ├── data.json          # RAM variable definitions
-    ├── scenario.json      # Reward/done conditions
-    ├── metadata.json      # Game metadata
-    ├── rom.sha            # ROM hash
-    └── *.state            # Savestate files
-```
-
-The `data.json` must define at least `xscrollHi`, `xscrollLo`, `player_state`, and `lives` as RAM variables. Death detection relies on `player_state` transitioning to 11 (dying animation) and on `lives` decreasing (fall deaths). The CNeuroMod `mario.stimuli` integration provides all required variables.
-
-On the first run, enter the path to the directory that *contains* `SuperMarioBros-Nes/` (not the `SuperMarioBros-Nes/` folder itself) in the **Retro integration dir** field of the GUI dialog. This path is saved to `.smb_ssl_settings.json` and will be pre-filled on subsequent runs.
-
-MSP mode does not require this — you can leave the field empty.
-
-### Running the task
-
-```bash
-# As a module
-python -m smb_ssl_task
-
-# Or via the installed entry point
-smb-ssl-task
-```
+(`uv run` activates the project `.venv` for you; you can also `source .venv/bin/activate` and drop the `uv run` prefix.)
 
 A GUI dialog will prompt you for:
 
@@ -229,7 +124,9 @@ A GUI dialog will prompt you for:
 | **Retro integration dir** | Directory containing `SuperMarioBros-Nes/` (gameplay mode only, saved across runs) |
 | **Advanced mode** | Opens an extended configuration panel (see below) |
 
-### Session types
+MSP mode does not require **Retro integration dir** — you can leave the field empty.
+
+## Session types
 
 **Pre-training** (`pretrain`) — Familiarization using 6 scenes not in the experimental set. Self-paced, two executions per trial (both guided). No points.
 
@@ -245,7 +142,7 @@ Adaptive reward system: 0 points (error/slow), 1 point (correct), 3 points (corr
 
 **Scan session — full speed** (`scan_fullspeed`) — Same structure but with a short static go-cue instead of the expanding pacing line.
 
-### Advanced mode
+## Advanced mode
 
 When **Advanced mode** is checked, a comprehensive configuration panel opens before the session starts. All parameters are pre-populated with their current defaults; the user only changes what they need.
 
@@ -267,7 +164,7 @@ Any changed values override the corresponding `config.py` constant for that sess
 
 **Dialog 2 — Clip selection (optional):** Only shown when a Scene ID filter is set and the scenes dataset is valid. Allows selecting a specific BK2 clip from the dataset, which overrides the default canonical sequence for that scene.
 
-### Action vocabulary
+## Action vocabulary
 
 NES inputs are compressed into distinct actions, each representing a set of simultaneously held buttons:
 
@@ -286,7 +183,7 @@ NES inputs are compressed into distinct actions, each representing a set of simu
 
 In MSP mode, each element in the sequence is a chord with a target duration. The player must press the correct button combination and hold it for the indicated duration (shown by a horizontal bar below each symbol). A configurable timing tolerance (default 50ms) allows for small timing errors.
 
-### Input mapping
+## Input mapping
 
 **Keyboard:**
 
@@ -303,7 +200,7 @@ In MSP mode, each element in the sequence is a chord with a target duration. The
 
 Press `Escape` at any time to abort the session (data collected so far is saved).
 
-### Scene selection
+## Scene selection
 
 12 scenes are hardcoded (2 groups of 6), drawn from worlds 1–2 of the CNeuroMod `mario.scenes` dataset:
 
@@ -312,9 +209,26 @@ Press `Escape` at any time to abort the session (data collected so far is saved)
 
 Group 1 trains on Set 1 (Set 2 untrained); Group 2 trains on Set 2 (Set 1 untrained). 6 additional pretrain scenes are selected from non-overlapping positions.
 
-### SSL output
+## Output
 
-Data is saved to `data/` with the same directory structure as the Berlot task. Each TSV file has one row per execution with columns covering both modes:
+Data is saved to `output/` in the working directory:
+
+```
+output/
+└── sub-01/
+    ├── pretrain/
+    │   └── sub-01_pretrain_ses-01.tsv
+    ├── training/
+    │   └── sub-01_training_ses-01.tsv
+    ├── test/
+    │   └── sub-01_test_ses-01.tsv
+    ├── scan_paced/
+    │   └── sub-01_scan_paced_ses-01.tsv
+    └── scan_fullspeed/
+        └── sub-01_scan_fullspeed_ses-01.tsv
+```
+
+Each TSV file has one row per execution with columns covering both modes:
 
 | Column | Description |
 |---|---|
@@ -347,7 +261,7 @@ Data is saved to `data/` with the same directory structure as the Berlot task. E
 
 Columns not applicable to the current mode are filled with `NA`.
 
-### SSL configuration
+## Configuration
 
 Edit `smb_ssl_task/config.py` to adjust:
 
@@ -359,11 +273,11 @@ Edit `smb_ssl_task/config.py` to adjust:
 - Input mappings (keyboard and gamepad)
 - Duration bar appearance and timing tolerance
 - BK2 clip filtering (min/max elements, min duration, allowed symbols)
-- Path to the `mario.scenes` dataset (set in GUI)
+- Output directory (default: `output/`)
 
 Alternatively, use **Advanced mode** in the GUI to override any config parameter for a single session without editing the file. Overrides are applied at startup via `config.apply_overrides()` and propagated to all loaded modules.
 
-### BK2 parser
+## BK2 parser
 
 `smb_ssl_task/scenes.py` includes a standalone BK2 parser for extracting action sequences from replay files:
 
@@ -389,31 +303,20 @@ The 12 experimental scenes currently use pre-extracted placeholder sequences. Th
 SMB-MSL/
 ├── pyproject.toml
 ├── README.md
-├── SMB-MSL-brainstorm.md
-├── berlot2020_task/
-│   ├── __init__.py
-│   ├── __main__.py          # Entry point and GUI dialog
-│   ├── config.py            # All configurable parameters
-│   ├── sequences.py         # 12 sequence definitions, pretrain generation, mirror functions
-│   ├── display.py           # Visual stimuli, pacing line, and feedback screens
-│   ├── data_logging.py      # TSV file writer
-│   ├── task_training.py     # Training session logic
-│   ├── task_test.py         # Behavioral test (right and left hand)
-│   ├── task_pretrain.py     # Pre-training session
-│   └── task_scan.py         # Scan session (paced and full-speed)
+├── setup.sh                       # datalad install + unpack helper
 └── smb_ssl_task/
     ├── __init__.py
-    ├── __main__.py          # Entry point, GUI dialog, mode dispatch
-    ├── config.py            # All parameters (display, timing, input, paths)
-    ├── advanced_gui.py      # Advanced mode: config overrides + clip selection dialogs
-    ├── scenes.py            # Scene definitions, BK2 parser, action vocabulary
-    ├── input_handler.py     # Unified keyboard/gamepad -> NES button mapping
-    ├── data_logging.py      # TSV writer (MSP + gameplay columns)
-    ├── display.py           # Shared instruction/feedback/rest screens
-    ├── msp.py               # MSP mode: ActionSequenceDisplay + chord/duration collection
-    ├── game.py              # Gameplay mode: gym-retro wrapper + rendering
-    ├── task_training.py     # Training session
-    ├── task_test.py         # Behavioral test
-    ├── task_pretrain.py     # Pre-training
-    └── task_scan.py         # Scan session
+    ├── __main__.py                # Entry point, GUI dialog, mode dispatch
+    ├── config.py                  # All parameters (display, timing, input, paths)
+    ├── advanced_gui.py            # Advanced mode: config overrides + clip selection dialogs
+    ├── scenes.py                  # Scene definitions, BK2 parser, action vocabulary
+    ├── input_handler.py           # Unified keyboard/gamepad -> NES button mapping
+    ├── data_logging.py            # TSV writer (MSP + gameplay columns)
+    ├── display.py                 # Shared instruction/feedback/rest screens
+    ├── msp.py                     # MSP mode: ActionSequenceDisplay + chord/duration collection
+    ├── game.py                    # Gameplay mode: stable-retro wrapper + rendering
+    ├── task_training.py           # Training session
+    ├── task_test.py               # Behavioral test
+    ├── task_pretrain.py           # Pre-training
+    └── task_scan.py               # Scan session
 ```
